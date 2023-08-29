@@ -1,0 +1,292 @@
+<html>
+<body style="background-color:black">
+<style>
+label{color:white;}
+.container {
+  position: relative;
+}
+#overlay {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-family: monospace;
+  padding: 1em;
+}
+#instructionsHideShow{
+	color:red;
+}
+
+#MIDDLE_overlay {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  background-color: rgba(0, 0, 0, 0);
+  color: yellow;
+  font-family: monospace;
+  font-size:30px;
+  padding: 1em;
+  transform: translate(-50%,0%);
+
+  
+}
+#RIGHT_overlay {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-family: monospace;
+  padding: 1em;
+}
+
+#credits {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: lightgreen;
+  font-family: monospace;
+  padding: 1em;
+}
+
+html, body {
+	overflow: hidden;
+}
+</style>
+<center>
+	<div class="container">
+		<canvas id="canvas" width=1300 height=700>PROBLEME AVEC TON NAVIGATEUR</canvas>
+		<div id="overlay">
+			<div>FPS: <span id="fps"></span></div>
+			<div>polytope: <span id="polytope"></span></div>
+			<div>dimension de base: <span id="dimBase"></span></div><br/>
+			<div ><span id="instructionsHideShow">"W" pour les instructions</span></div>
+		</div>
+		<div id="MIDDLE_overlay">
+			<div><span id="USERINFO"></span></div>
+		</div>
+		<div id="credits">
+			<div>Créé par Samuel AIDAN</div>
+		</div>
+		<div id="RIGHT_overlay">
+			couple appliqué:<br/>
+			<canvas id="couple" width=100 height=100></canvas>
+		</div>
+		
+	</div>
+<form id="form" onchange="form_change()">
+</form>
+<form id="form2" onchange="form2_change()">
+</form>
+</center>
+<script src="MatrixTIPE.js"></script>
+<script src="webgpu.js"></script>
+<script src="simplex.js"></script>
+<script src="CAMS.js"></script>
+<script src="Sets.js"></script>
+<script src="RegularPolyhedron.js"></script>
+<script>
+
+"use strict";
+/////////TODO: Pentagonal icositetrahedron (alternation?)
+/////////////////compute shader pour calculer les normales
+///"normal mapping"
+const INSTRUCTIONS=`ZQSDAE pour bouger la caméra<br/>←↑→↓ pour l'orienter.<br/>Pour bouger le solide :<br/>K-M I-P O-L U-J Y-H T-G R-F C-V B-N<br/>(vérifier avec le panel en haut à droite)`
+const keysCouples="km ip ol uj yh tg rf cv bn".split(" ")
+let invKeysCouples=arr(5, i=>new Array(5))
+let inuindex=0
+for(let y=1;y<5 && inuindex < keysCouples.length;y++){
+	for(let x=0;x<y && inuindex<keysCouples.length;(x++) + (inuindex++)){
+		invKeysCouples[y][x]=keysCouples[inuindex][0].toUpperCase()
+		invKeysCouples[x][y]=keysCouples[inuindex][1].toUpperCase()
+	}
+}
+
+let instructionsShown=false;
+const kp={}//keys pressed
+document.onkeydown=e=>{kp[e.key]=true;if(e.key=="x" && (go=!go)){
+	FPSINTERVAL=setInterval(calcfps,500);
+	document.getElementById("USERINFO").innerHTML=""
+	hasStarted=true
+	main()
+}else if(e.key=="w"){
+	if((instructionsShown=!instructionsShown))document.getElementById("instructionsHideShow").innerHTML=INSTRUCTIONS
+	else document.getElementById("instructionsHideShow").innerHTML='"W" pour les instructions'
+}}
+document.onkeyup=e=>(kp[e.key]=0)
+//const ctx=document.getElementById("canvas").getContext("2d")///change si tu veux webgl	
+const canvas=document.getElementById("canvas")
+const W=canvas.width
+const H=canvas.height
+
+function commence(s="4 3"){
+	let oldDIM=DIM
+	c=RegPoly.getFromSchlaf(s).getCloud()
+	DIM=c.dim
+	S=new Solide(c, P.zero(DIM))//position changée dans "commence"
+	S.rot=M.randomSkew(DIM).mulr(0.4)//de norme 0.1
+	S.v=P.ui(DIM,1).f(0.4).plus(P.randomPointBoule(DIM).f(0.1))
+	S.mat=M.randomMatrix(DIM,DIM).ortho()////orientation de départ
+	S.pos=P.ui(DIM,1).f(2)
+
+	cs=new CamChain(DIM)
+	cs.l[3].pos.l=new Float32Array([0,2,-6.5])
+	cs.l[3].m=M.id(DIM)
+	
+	firstDraw=true;
+}
+function calcfps(){
+	document.getElementById("fps").innerHTML=2*fps
+	console.log("fps : "+2*fps)
+	fps=0
+}
+function setupForm(l,l2){////[["value", function]...]
+	let rep=""
+	for(let v of l){
+		rep+=`<input type="radio" id='INPUT_${v}' name="form1" value='${v}'>
+  <label for='${v}'>${v}</label>`
+	}
+	document.getElementById("form").innerHTML=rep;
+	rep=""
+	for(let v of l2){
+		rep+=`<input type="checkbox" id='INPUT_${v}' name="form2" value='${v}'>
+  <label for='${v}'>${v}</label>`
+	}
+	document.getElementById("form2").innerHTML=rep;
+}
+function form_change(){
+	let ticked=-1
+	const elem=document.getElementById("form").elements
+	for(let i of elem){
+		if(i.checked){
+			ticked=i.value
+			break
+		}
+	}
+	console.log("ticked : "+ticked)
+	actuText(ticked)
+	commence(ticked)
+	main()
+}
+function form2_change(){
+	const elem=document.getElementById("form2").elements
+	for(let i of elem){
+		if(i.checked != curSettings[i.value]){
+			if(i.value=="colorsDiff") firstDraw=true;
+			curSettings[i.value]=i.checked
+		}
+	}
+
+}
+
+setupForm(["3 3","4 3","3 4","5 3","3 5", "r 4 3","r 5 3","s1","s2","3 3 3","4 3 3","3 3 4","3 4 3","3 3 5","5 3 3","3 3 3 3","4 3 3 3","3 3 3 4","3 3 3 3 3","4 3 3 3 3","3 3 3 3 4"], ["perspective", "colorsDiff"])
+const polyInfos={
+	"5 3":"dodécaèdre",
+	"3 5":"icosaèdre",
+	"r 4 3":"cuboctahèdre",
+	"r 5 3":"icosidodécahèdre",
+	"s1":"dodécahèdre rhombique",
+	"s2":"tricontahèdre rhombique",
+	"3 4 3":"octaplexe",
+	"3 3 5":"hexacosichore",
+	"5 3 3":"dodécaplexe"
+}
+for(let dim=3; dim<10;dim++){
+	let inu=arr(dim-1,i=>3)
+	polyInfos[inu.join(" ")]="tétrahèdre"
+	inu[inu.length-1]=4
+	polyInfos[inu.join(" ")]="octahèdre"
+	inu[inu.length-1]=3
+	inu[0]=4
+	polyInfos[inu.join(" ")]="cube"
+}
+const domNodes={
+	polytope:document.createTextNode(""),
+	dimBase:document.createTextNode(""),
+	//USERINFO:document.createTextNode(""),
+}
+document.getElementById("polytope").appendChild(domNodes.polytope);
+document.getElementById("dimBase").appendChild(domNodes.dimBase);
+
+function actuText(s){
+	domNodes.polytope.nodeValue=polyInfos[s]
+	domNodes.dimBase.nodeValue=RegPoly.getFromSchlaf(s).dim
+}
+const coupleCanCtx=document.getElementById("couple").getContext("2d")
+coupleCanCtx.clearRect(0,0,100,100)
+coupleCanCtx.textAlign="center"
+coupleCanCtx.textBaseline="middle"
+
+function actuCanCouple(mat){///Mat: le couple normalisé
+	const ctx=coupleCanCtx
+	ctx.clearRect(0,0,100,100)
+	const cote=100/mat.w
+	ctx.font=`${Math.round(20*3/mat.w)}px serif`
+	for(let x=0;x<mat.w;x++){
+		for(let y=0;y<mat.h;y++){
+			let v=mat.l[y][x];
+			let col=(y==x)?"black":Math.abs(v)>0.1?"darkred":(y==1 || x==1)?"lightgray":"gray"
+			/////couples qui font pas frotter par terre en plus clair
+			ctx.fillStyle=col
+			ctx.fillRect((x+1/20)*cote,(y+1/20)*cote,cote*19/20,cote*19/20)
+			ctx.fillStyle="white"
+			if(v>0.1){
+				ctx.fillRect((x+0.5-2/20)*cote,(y+2/20)*cote,cote*4/20,cote*16/20)
+				ctx.fillRect((x+2/20)*cote,(y+0.5-2/20)*cote,cote*16/20,cote*4/20)
+			}else if(v<-0.1){
+				ctx.fillRect((x+2/20)*cote,(y+0.5-2/20)*cote,cote*16/20,cote*4/20)
+			}else if(x!=y && (invKeysCouples[y] && invKeysCouples[y][x])){
+				ctx.fillStyle="black"
+				ctx.fillText(invKeysCouples[y][x], (x+0.5)*cote,(y+0.5)*cote)
+			}
+		}
+	}
+}
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight-100;
+}
+window.addEventListener('resize', resize, false); resize();
+
+let c=-1//RegPoly.getFromSchlaf("s2").getCloud()
+let  DIM=-1
+let S=-1//new Solide(c, P.zero(DIM))//position changée dans "commence"
+
+let cs=-1//new CamChain(DIM)
+
+let go=0
+let firstDraw=true
+WebGPURenderer.init(["matcam:mat3x3f","campos:vec3f","dim:vec2f","lumAngle:vec3f","center:vec3f"],document.getElementById("canvas")).then(main)
+
+let curSettings={perspective:false, colorsDiff:false}
+const cursettings=curSettings
+
+commence("3 3")
+actuText("3 3")
+document.getElementById("USERINFO").innerHTML='"X" POUR COMMENCER<br/>"W" POUR INSTRUCTIONS'
+
+
+let hasStarted=false///true au premier go
+let fps=0;
+
+let FPSINTERVAL=setInterval(calcfps,500)
+function main(){
+	//eff()
+	fps++
+	for(let i=0;i<100;i++)S.actu(0.03,0.01);
+	
+	actucam(fps%5==0)
+	cs.apply(S.getCloud(),{perspective:curSettings.perspective, initPoints:firstDraw, colorsDiff:curSettings.colorsDiff})
+	firstDraw=false
+	if(!go){
+		clearInterval(FPSINTERVAL)
+		if(hasStarted)document.getElementById("USERINFO").innerHTML="EN PAUSE. \"X\" POUR REPRENDRE"
+		return
+	}
+	window.requestAnimationFrame(main)
+}
+</script>
+</body>
+</html>
