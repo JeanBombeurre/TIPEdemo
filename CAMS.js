@@ -14,9 +14,9 @@ class Cam{//caméra en n dimensions
 		return c2
 	}
 }
-function actucam(displayCouple){
-	const v=0.1
-	const va=0.03
+function actucam(displayCouple, dt=1){
+	const v=0.1*dt
+	const va=0.03*dt
 	let cam=cs.l[3]
 	let dv={z:[0,0,1],s:[0,0,-1],d:[1,0,0],q:[-1,0,0],a:[0,1,0],e:[0,-1,0]}
 	let da={ArrowUp:[0,1],ArrowDown:[0,-1],ArrowLeft:[-1,0],ArrowRight:[1,0]}
@@ -34,7 +34,7 @@ function actucam(displayCouple){
 	let inu=M.getCouple(cam.m.getCol(2),p(0,dz[1],0).mul(cam.m)).exp(va)
 	cam.m=cam.m.mul(inu)
 	cam.m=cam.m.mul(M.getCouple(p(0,0,1),p(dz[0],0,0)).exp(va))
-	const couple=0.05
+	const couple=0.06*dt
 	let RESULTANTE=M.empty(S.dim,S.dim)
 	let x=0,y=1//////on parcourt l'espace des couples en escaliers...
 	for(let i=0;i<keysCouples.length;i++){
@@ -58,7 +58,7 @@ class CamChain{
 			this.l.push(new Cam(pos))
 		}
 	}
-	apply(cloud,infos={perspective: true, initPoints:true, colorsdiff:false}){///cloud est possiblement le simplex en question, initPoints=true ssi on redner un modèle pour la 1e fois
+	apply(cloud,infos={perspective: true, initPoints:true, colorsdiff:false,lumAngle:0.2}){///cloud est possiblement le simplex en question, initPoints=true ssi on redner un modèle pour la 1e fois
 		let rep=cloud
 		if(infos.perspective) {
 			for(let i=this.dim;i>=4;i--)cloud=this.l[i].apply(cloud,infos).mul(M.id(i-1).mulr(this.zoomSuccessifs))
@@ -68,6 +68,6 @@ class CamChain{
 		//affiche avec webgpu
 		const center3d=P.zero(3);
 		for(let i=0;i<cloud.p.length;i++)center3d.inc(cloud.p[i].f(1/cloud.p.length))
-		cloud.affGPU(this.l[3],center3d,infos.initPoints,infos.colorsDiff)
+		cloud.affGPU(this.l[3],center3d,infos.initPoints,infos.colorsDiff,infos.lumAngle)
 	}
 }
