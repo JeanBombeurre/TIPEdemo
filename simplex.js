@@ -40,8 +40,8 @@ class Cloud{//nuage de points
 		return new Cloud(p2,this.l)
 	}
 	
-	affGPU(cam,center3d,init=false, colorsdiff=false){////render le cloud courant selon la cam(3D). si la premiere fois quo'on aff un mdele:init=true.
-		const lumangle=p(2,3,1).unit()///////////////pas dans le bon sens???///
+	affGPU(cam,center3d,init=false, colorsdiff=false,lumAngle=0.2){////render le cloud courant selon la cam(3D). si la premiere fois quo'on aff un mdele:init=true.
+		const lumangle=p(Math.sin(lumAngle),Math.cos(lumAngle),0).unit()///////////////pas dans le bon sens???///
 
 		let ombrespoints=arr(this.p.length,i=>{//calcul de l'ombre
 			let p0=this.p[i];
