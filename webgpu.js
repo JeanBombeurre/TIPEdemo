@@ -6,30 +6,43 @@ function flattenForShader(mat){///argument : une M. retourne une float32Array de
 		for(let x=0;x<3;x++) rep[4*x+y]=mat.l[y][x]///change éventuellement pour transposed?
 	}return rep
 }
+function createSol(R=60,cote=0.2){///cote:taille du coté des petits triangles, R: nomre de triangles en rayon
+	const YSOL=-0.015////y du sol
+	
+	const h2=Math.sqrt(1-0.5**2)///hauteur géométrique du triangle
+	let solp=arr(R+1,x=>p((x-R/2)*cote,YSOL,R*h2*cote))
+	let soll0=[]
+	let oldW=solp.length
+	for(let y=R-1;y>=-R;y--){
+		const i=R-y
+		const curW=y>0?R+1+i:3*R+1-i
+		const newp=arr(curW,x=>p((x-(curW-1)/2)*cote,YSOL,y*h2*cote))
+		if(curW>oldW){
+			for(let k=0;k<oldW;k++)soll0.push([solp.length-oldW+k,solp.length+k,solp.length+k+1])
+			for(let k=1;k<curW-1;k++)soll0.push([solp.length+k,solp.length-oldW+k-1,solp.length-oldW+k])
+		}else{
+			for(let k=1;k<oldW-1;k++)soll0.push([solp.length-oldW+k,solp.length+k-1,solp.length+k])
+			for(let k=0;k<curW;k++)soll0.push([solp.length+k,solp.length-oldW+k,solp.length-oldW+k+1])
+		}
+		solp=solp.concat(newp)
+		oldW=curW
+	}
+	for(let po of solp){
+		let inu=P.randomPointBoule(2)
+		po.inc(p(inu.x*cote/2.5,0,inu.y*cote/2.5))
+	}
+	return {solp,soll0}
+}
 function blend(points, indices, color, normal){///le blend dans une seule Float32Array. les Colors sont en 0-255 entières. les Indices vont 3 par 3.
 /*resultat
 (xxxx yyyy zzzz)(rgba)(nx ny nz) ... -> 3 de ces blocs pour une face. dans une face seuls les x y z changent... 
 */
 	////sol:
-	const YSOL=-0.015////y du sol
-	const solw=31,solh=31// nombre de points en largeur/hauteur du sol
-	const cote=0.9;////taille du cote des carres
-	const solp=arr(solw*solh,i=>{
-		let x=i%solw, y=i/solw|0
-		let inu=P.randomPointBoule(2).f(cote/3)
-		return p(x*cote+inu.x,YSOL,y*cote+inu.y).moins(p((solw-1)/2,0,(solh-1)/2).f(cote))
-	})
-	const soll0=arr(2*(solw-1)*(solh-1),i=>{
-		let k=i/2|0
-		const x=k%(solw-1);
-		const y=k/(solh-1)|0;
-		let indices=[y*solw+x,y*solw+x+1,(y+1)*solw+x,(y+1)*solw+x+1]
-		return [indices[1],indices[2],i%2?indices[0]:indices[3]]
-	})
+	const {solp,soll0}=createSol()
 	const soll=[].concat(...soll0);
-	const solcol=[128,128,128,128]///couleur de tout le sol toujours
-	const solnormales=arr(solp.length,i=>p(0,1,0).plus(P.randomPointBoule(3).f(0.05)))
-
+	const solcol=[100,100,100,128]///couleur de tout le sol toujours
+	const solnormales=arr(solp.length,i=>p(0,1,0).plus(P.randomPointBoule(3).f(0.02)))
+	
 	const n=indices.length
 	const nfaces=normal.length
 	let  rep=new Float32Array((n+soll.length)*7)
@@ -114,7 +127,8 @@ class WebGPURenderer{
 			let refl=dir-2.0*u*dot(u,dir);
 			var lum:f32;
 			let inu=dot(refl,uni.lumAngle);
-			if(inu>0.8){lum=smoothstep(0.8,1.0,inu)*0.6+1.0;}else{lum=1.0;}
+			if(inu>0.8){lum=smoothstep(0.8,1.0,inu)*0.4+1.0;}else{lum=1.0;}
+			if(k>0.4 && k<0.6){ lum=1+(lum-1)/2;}////sol reflète moins que le solide
 			if(k==0.0){ return vec4f(0.0,0.0,0.0,0.5);}
 			else{return vec4f(lum*col.xyz,1);}
 		}
