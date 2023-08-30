@@ -62,6 +62,14 @@ html, body {
 			<div>FPS: <span id="fps"></span></div>
 			<div>polytope: <span id="polytope"></span></div>
 			<div>dimension de base: <span id="dimBase"></span></div><br/>
+			
+			<label for="grav">grav</label>
+			<input type="range" id="gravSlider" name="grav" min="0.001" max="0.06" step="0.001" value="0.03"/>
+			<span id="gravText"></span><br/>
+			<label for="lumAngle">angle</label>
+			<input type="range" id="lumAngleSlider" name="lumAngle" min="0" max="1.5" step="any" value="0.6"/>
+			<span id="lumAngleText"></span>
+			<br/><br/>
 			<div ><span id="instructionsHideShow">"W" pour les instructions</span></div>
 		</div>
 		<div id="MIDDLE_overlay">
@@ -93,6 +101,7 @@ html, body {
 /////////TODO: Pentagonal icositetrahedron (alternation?)
 /////////////////compute shader pour calculer les normales
 ///"normal mapping"
+//hexagonal tiling
 const INSTRUCTIONS=`ZQSDAE pour bouger la caméra<br/>←↑→↓ pour l'orienter.<br/>Pour bouger le solide :<br/>K-M I-P O-L U-J Y-H T-G R-F C-V B-N<br/>(vérifier avec le panel en haut à droite)`
 const keysCouples="km ip ol uj yh tg rf cv bn".split(" ")
 let invKeysCouples=arr(5, i=>new Array(5))
@@ -120,6 +129,8 @@ document.onkeyup=e=>(kp[e.key]=0)
 const canvas=document.getElementById("canvas")
 const W=canvas.width
 const H=canvas.height
+let curSettings={perspective:false, colorsDiff:false,lumAngle:0.3}
+const cursettings=curSettings
 
 function commence(s="4 3"){
 	let oldDIM=DIM
@@ -249,6 +260,21 @@ function resize() {
     canvas.height = window.innerHeight-100;
 }
 window.addEventListener('resize', resize, false); resize();
+function actuGravText(){
+	GRAV=document.getElementById("gravSlider").value
+	console.log(GRAV)
+	document.getElementById("gravText").innerHTML=(GRAV/0.03).toFixed(2)
+}
+let GRAV=0.03
+document.getElementById("gravSlider").addEventListener('change', actuGravText);
+actuGravText()
+function actuLumAngleText(){
+	curSettings.lumAngle=document.getElementById("lumAngleSlider").value
+	console.log(curSettings.lumAngle)
+	document.getElementById("lumAngleText").innerHTML=(curSettings.lumAngle*180/Math.PI).toFixed(1)
+}
+document.getElementById("lumAngleSlider").addEventListener('change', actuLumAngleText);
+actuLumAngleText()
 
 let c=-1//RegPoly.getFromSchlaf("s2").getCloud()
 let  DIM=-1
@@ -260,8 +286,6 @@ let go=0
 let firstDraw=true
 WebGPURenderer.init(["matcam:mat3x3f","campos:vec3f","dim:vec2f","lumAngle:vec3f","center:vec3f"],document.getElementById("canvas")).then(main)
 
-let curSettings={perspective:false, colorsDiff:false}
-const cursettings=curSettings
 
 commence("3 3")
 actuText("3 3")
@@ -272,13 +296,24 @@ let hasStarted=false///true au premier go
 let fps=0;
 
 let FPSINTERVAL=setInterval(calcfps,500)
-function main(){
-	//eff()
+let prevTIME=0;
+
+function main(TIME=-1){
+	let dt=TIME==-1?1/60:(TIME-prevTIME)/1000
+	prevTIME=TIME==-1?0:TIME;
+	if(dt<0.005)dt=0.005
+	if(dt>0.025)dt=0.025
+
 	fps++
-	for(let i=0;i<100;i++)S.actu(0.03,0.01);
 	
-	actucam(fps%5==0)
-	cs.apply(S.getCloud(),{perspective:curSettings.perspective, initPoints:firstDraw, colorsDiff:curSettings.colorsDiff})
+	const quantite_a_actu_par_seconde=60/////////nb de dt à actu/seconde en temps normal
+	const quantite_frame=dt*quantite_a_actu_par_seconde
+	for(let i=0;i<70;i++)S.actu(GRAV,quantite_frame/70);
+	
+	//for(let i=0;i<100;i++)S.actu(0.03,0.03);
+	
+	actucam(fps%5==0, dt*60)
+	cs.apply(S.getCloud(),{perspective:curSettings.perspective, initPoints:firstDraw, colorsDiff:curSettings.colorsDiff,lumAngle:curSettings.lumAngle})
 	firstDraw=false
 	if(!go){
 		clearInterval(FPSINTERVAL)
