@@ -138,8 +138,7 @@ class WebGPURenderer{
 		const adapter = await navigator.gpu?.requestAdapter();
 		const device = await adapter?.requestDevice();
 		if (!device) {
-			alert('need a browser that supports WebGPU');
-			return;
+			alert('Le navigateur ne supporte pas WebGPU.\nEssaye sur PC avec : \n Chrome version 113+ (2 mai 2023 ou après) ou\n Edge version 113+ (4 mai 2023 ou après) \n(Opéra marche peut-être)\nSur MacOS, ChromeOS ou Windows. (Pour Linux: Nécessite activation)');			return;
 		}
 		const context = canvas.getContext('webgpu');
 		const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
