@@ -150,7 +150,7 @@ class Solide{
 	
 	actu(grav,dt=1){//grav  : un réel décrivant la gravité SELON LA 2E COORDONNEE (Y)
 		this.v.inc(P.ui(this.n,1).f(-grav*dt))//gravité selon -y
-		this.acc=this.rot.mul(this.rot)
+		//this.acc=this.rot.mul(this.rot)
 		this.pos.inc(this.v.f(dt))
 		//this.effetBizarreCouple(dt)
 		this.m=this.m.mul(this.rot.exp(dt))
