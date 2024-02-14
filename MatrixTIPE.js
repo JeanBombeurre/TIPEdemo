@@ -156,7 +156,7 @@ class M{
 		for(let i=0;i<this.w;i++){
 			let cur=cols[i]
 			for(let j=0;j<i;j++){
-				cur.proj(cols[j])///pas besoin de renormalize à chaque fois (?) pas trop de risque normalement
+				cur=cur.proj(cols[j])///pas besoin de renormalize à chaque fois (?) pas trop de risque normalement
 			}
 			cols[i]=cur.unit()
 		}
